@@ -1,0 +1,24 @@
+{
+  "name": "openclaw",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "OPENclaw-build": "./index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@clack/core": "^1.4.3",
+    "@clack/prompts": "^1.7.0",
+    "@openrouter/ai-sdk-provider": "^3.0.0",
+    "ai": "^7.0.66",
+    "chalk": "^6.0.0",
+    "commander": "^15.0.0",
+    "figlet": "^1.11.4"
+  }
+}
