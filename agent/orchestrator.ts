@@ -8,8 +8,7 @@ import { stepCountIs, ToolLoopAgent } from "ai";
 import { getAgentModel } from "../ai/ai.config";
 import { convertArrayToReadableStream } from "ai/test";
 import { renderTerminalMarkdown } from "../tui/terminal";
-
-
+import { runApprovalFlow } from "./approval";
 
 // this function It connects all the pieces together and starts the agent loop.
 export async function runAgentModel(){
@@ -68,6 +67,18 @@ export async function runAgentModel(){
      })
      if (result.text?.trim()) console.log(renderTerminalMarkdown(result.text));
      
+     const ok = await runApprovalFlow(tracker);
+      if(!ok) return executer.clearStaging();
+      const {errors}=executer.applyApprovedFromTracker();
+      if(errors.length){
+        console.log(chalk.red("\n Some operation reported errors:\n"));
+        for(const e of errors) console.log(chalk.red(` -${e}`))
+      }
+    else{
+        console.log(chalk.green("\n Applied.\n"))
+    }
+    // to free memory and avoid accidental re application of the same actions;
+    executer.clearStaging();
 
   
 

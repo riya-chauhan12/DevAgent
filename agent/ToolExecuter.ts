@@ -425,19 +425,28 @@ export class ToolExecuter{
     return text;
   }
 
+  //commit approved changes to the real file system
+  // it returns a object that include  errors whihc contain array of string that occurred during the commit process.
+
   applyApprovedFromTracker(): { errors: string[] } {
     const errors: string[] = [];
+    //creates a new array containing those actions 
     const all = [...this.tracker.getAction()];
 
     for (const a of all.filter(
       (x) => x.type === "folder_create" && x.status === "approved",
     )) {
       try {
+
+        // fs  Create a directory/folder.
+        
         fs.mkdirSync(this.resolveSafe(a.path), { recursive: true });
       } catch (e) {
         errors.push(String(e));
       }
     }
+    // this filters  all approved file operations.(ignores reject or pending)
+    // then use sort to sort operation based on timestamp(oldest to  newest)
 
     const fileOps = all
       .filter(
@@ -449,16 +458,24 @@ export class ToolExecuter{
       )
       .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
+      //create a map to store the last approved operation for each file path.
+      //map do not have duplicate key,Only the latest approved action for each file remains.
     const lastByPath = new Map<string, ActionLog>();
+    //populate the map with the actions
+
     for (const a of fileOps) lastByPath.set(this.norm(a.path), a);
 
     for (const [p, a] of lastByPath) {
       try {
         if (a.type === "file_delete")
+          // if action is file delte fs.rmSync() removes the file.
           fs.rmSync(this.resolveSafe(p), { force: true });
         else {
+          // create ot modify file,path.dirname(target) gets the parent directory.
           const target = this.resolveSafe(p);
           fs.mkdirSync(path.dirname(target), { recursive: true });
+         //actual modification  after contain the file should look like after the change.
+         // if after is empty we write empty string so we don't get undefined 
           fs.writeFileSync(target, a.details.after ?? "", "utf8");
         }
       } catch (e) {
@@ -466,11 +483,15 @@ export class ToolExecuter{
       }
     }
 
+//All approved tool_execute actions(like nom install ,npm test etc) are executed in the order they were approvved
     for (const a of all.filter(
       (x) => x.type === "tool_execute" && x.status === "approved",
     )) {
+
       const cmd = a.details.command;
+      // if cmd doesnt exit skip  the iteration
       if (!cmd) continue;
+      // this part run terminal command
       const r = spawnSync(cmd, {
         shell: true,
         cwd: this.config.codebasePath,
@@ -483,6 +504,7 @@ export class ToolExecuter{
 
     return { errors };
   }
+
 
   clearStaging():void{
     this.overlay.clear()
