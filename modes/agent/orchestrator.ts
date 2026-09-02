@@ -5,9 +5,9 @@ import { ActionTracker } from "./actionTracker";
 import { ToolExecuter } from "./ToolExecuter";
 import { createAgentTools } from "./agentTool";
 import { stepCountIs, ToolLoopAgent } from "ai";
-import { getAgentModel } from "../ai/ai.config";
+import { getAgentModel } from "../../ai/ai.config";
 import { convertArrayToReadableStream } from "ai/test";
-import { renderTerminalMarkdown } from "../tui/terminal";
+import { renderTerminalMarkdown } from "../../tui/terminal";
 import { runApprovalFlow } from "./approval";
 
 // this function It connects all the pieces together and starts the agent loop.

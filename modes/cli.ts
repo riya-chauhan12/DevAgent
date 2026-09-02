@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { select,isCancel } from "@clack/prompts";
-import { runAgentModel } from "../../agent/orchestrator";
+import { runAgentModel } from "./agent/orchestrator";
 export async function runCliMode() {
     while(true){
         const mode=await select({

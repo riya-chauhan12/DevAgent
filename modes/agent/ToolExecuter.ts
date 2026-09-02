@@ -150,7 +150,7 @@ export class ToolExecuter{
 
         const key = this.norm(rel);
         const abs=this.resolveSafe(rel);
-        if(!fs.existsSync(abs) ||!this.deleted.has(key)){
+        if(!fs.existsSync(abs) && !this.deleted.has(key)){
             throw new Error(`create file already exists ${rel}`)
         }
         this.deleted.delete(key);

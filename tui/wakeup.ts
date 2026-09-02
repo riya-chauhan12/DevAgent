@@ -2,7 +2,7 @@ import {select ,isCancel} from "@clack/prompts"
 import chalk from "chalk"
 import figlet from "figlet"
 
-import { runCliMode } from "./mode/cli";
+import { runCliMode } from "../modes/cli";
 const BANNER_FONT='ANSI shadow';
 const SHADOW=chalk.hex('#53459a')
 const FACE=chalk.hex('#d3baf5').bold
