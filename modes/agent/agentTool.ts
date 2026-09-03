@@ -1,8 +1,8 @@
 import { tool } from "ai";
 import { z } from "zod";
-import type { ToolExecuter } from "./ToolExecuter";
+import type { ToolExecutor } from "./ToolExecutor";
 
-export function createAgentTools(executer: ToolExecuter) {
+export function createAgentTools(executor: ToolExecutor) {
     return {
         read_file: tool({
             description:
@@ -10,7 +10,7 @@ export function createAgentTools(executer: ToolExecuter) {
             inputSchema: z.object({
                 path: z.string().describe("Relative file path")
             }),
-            execute: async ({ path: p }) => executer.readFile(p),
+            execute: async ({ path: p }) => executor.readFile(p),
         }),
         create_file: tool({
             description: "Stage creation of new file (not written until the user approves).",
@@ -18,7 +18,7 @@ export function createAgentTools(executer: ToolExecuter) {
                 path: z.string(),
                 content: z.string(),
             }),
-            execute: async ({ path: p, content }) => executer.createFile(p, content),
+            execute: async ({ path: p, content }) => executor.createFile(p, content),
         }),
 
         modify_file:tool({
@@ -27,14 +27,14 @@ export function createAgentTools(executer: ToolExecuter) {
                 path:z.string(),
                 content:z.string().describe('Complete new file contents'),
             }),
-            execute: async ({path:p,content})=> executer.modifyFile(p,content),
+            execute: async ({path:p,content})=> executor.modifyFile(p,content),
         }),
         delete_file:tool({
             description: "Stage deletion of a file(pending approval).",
             inputSchema:z.object({
                 path:z.string(),
             }),
-            execute: async({path:p})=>executer.DeleteFile(p)
+            execute: async({path:p})=>executor.DeleteFile(p)
         }),
         create_folder: tool({
       description:
@@ -42,7 +42,7 @@ export function createAgentTools(executer: ToolExecuter) {
       inputSchema: z.object({
         path: z.string().describe("Relative directory path"),
       }),
-      execute: async ({ path: p }) => executer.createFolder(p),
+      execute: async ({ path: p }) => executor.createFolder(p),
     }),
       list_files: tool({
       description: "List files and directories under a path.",
@@ -51,7 +51,7 @@ export function createAgentTools(executer: ToolExecuter) {
         recursive: z.boolean().optional().default(false),
       }),
       execute: async ({ path: p, recursive }) =>
-        executer.listFiles(p, recursive),
+        executor.listFiles(p, recursive),
     }),
       search_files: tool({
       description:
@@ -64,7 +64,7 @@ export function createAgentTools(executer: ToolExecuter) {
         content_contains: z.string().optional(),
       }),
       execute: async ({ root, pattern, content_contains }) =>
-        executer.searchFiles(root, pattern, content_contains),
+        executor.searchFiles(root, pattern, content_contains),
     }),
     analyze_codebase: tool({
       description:
@@ -72,7 +72,7 @@ export function createAgentTools(executer: ToolExecuter) {
       inputSchema: z.object({
         path: z.string().default("."),
       }),
-      execute: async ({ path: p }) => executer.analyzeCodebase(p),
+      execute: async ({ path: p }) => executor.analyzeCodebase(p),
     }),
 execute_shell: tool({
       description:
@@ -80,13 +80,13 @@ execute_shell: tool({
       inputSchema: z.object({
         command: z.string().describe("Single command; runs with shell: true"),
       }),
-      execute: async ({ command }) => executer.queueShell(command),
+      execute: async ({ command }) => executor.queueShell(command),
     }),
     list_skills: tool({
       description:
         "List absolute paths to SKILL.md files under configured skill directories (Cursor / Claude).",
       inputSchema: z.object({}),
-      execute: async () => executer.listSkills(),
+      execute: async () => executor.listSkills(),
     }),
      read_skill: tool({
       description:
@@ -94,7 +94,7 @@ execute_shell: tool({
       inputSchema: z.object({
         path: z.string(),
       }),
-      execute: async ({ path: p }) => executer.readSkill(p),
+      execute: async ({ path: p }) => executor.readSkill(p),
     }),
 
     };

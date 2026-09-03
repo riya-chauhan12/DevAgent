@@ -35,7 +35,7 @@ function isProbablyTextFile(filepath: string):boolean {
 
 //bridge between  the ai tools and real file system
 
-export class ToolExecuter{
+export class ToolExecutor{
     // through overlay we have  stagged changes and kept in map
     private overlay=new Map<string,string>();
     //delete the staged things
@@ -68,7 +68,7 @@ export class ToolExecuter{
     }
 
 
-    //it function is basically a security/filter function for your ToolExecuter
+    //it function is basically a security/filter function for your Toolexecutor
     //Given a file path, decide whether the agent should exclude it from reading/modifying.
     private excluded (relPath:string): boolean{
         //normalizing the path using the the norm function

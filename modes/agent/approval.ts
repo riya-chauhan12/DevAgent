@@ -5,7 +5,7 @@ import type { ActionTracker } from "./actionTracker";
 import type { ActionLog } from "./types";
 import { composeBeforeAfter, formatPatch } from "./diff-view";
 import chalk from "chalk";
-import { renderTerminalMarkdown } from "../tui/terminal";
+import { renderTerminalMarkdown } from "../../tui/terminal";
 
 //this function we will implement the approval flow for the agent actions.
 // All the change

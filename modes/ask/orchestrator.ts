@@ -1,218 +1,127 @@
 import chalk  from 'chalk';
 import {confirm,isCancel, text} from "@clack/prompts";
 import {z} from "zod";
-import { ToolExecuter } from '../agent/ToolExecuter';
+import { ToolLoopAgent, stepCountIs, tool } from "ai";
+import { ToolExecutor } from '../agent/ToolExecutor';
 import {ActionTracker} from '../agent/actionTracker';
 import{ defaultAgentConfig} from '../agent//types';
 import{runApprovalFlow} from '../agent/approval';
 import {renderTerminalMarkdown} from '../../tui/terminal';
 import {getAgentModel} from '../../ai/ai.config';
-import { ToolLoopAgent, stepCountIs } from 'ai';
+
 import fs from 'node:fs'
 import path from 'node:path'
-function createAskTools(executer:ToolExecuter){
+function createAskTools(executor:ToolExecutor){
     return{
         
-            readFile(rel:string) :string {
-                this.assertNotExcluded(rel,'read_file')
-                const abs=this.resolveSafe(rel);
-                if(!fs.existsSync(abs) ||!fs.statSync(abs).isFile()){
-                    throw new Error(`File not found ${rel}`)
-                }
-                const st=fs.statSync(abs);
-                if(st.size>this.config.maxFileSizeToRead){
-                    throw new Error(`file too larage :${rel}`)
-        
-                }
-                const text= fs.readFileSync(abs,"utf8");
-                 this.tracker.log({
-                    type:"code_analysis",
-                    path:this.norm(rel),
-                    details:{after:text,toolName:"read_file"},
-                    status:"executed",
-                 })
-        
-                 return text;
-            },
-            listFiles(rel:string,recursive:boolean): string{
-                    this.assertNotExcluded(rel,"list_files");
-                    const abs=this.resolveSafe(rel);
-                    if(!fs.existsSync(abs)){
-                         throw new Error (`list_files:not found: ${rel}`)
-                    }
-                    const lines:string[]=[];
-                    const walk=(dir:string,prefix:string)=>{
-                        const entries=fs.readdirSync(dir,{withFileTypes:true});
-                        for(const ent of entries){
-                             const full=path.join(dir,ent.name);
-                             const relP=path.relative(this.config.codebasePath,full);
-                              if(this.excluded(relP)) continue;
-                              if(ent.isDirectory()){
-                                lines.push(`${prefix}${ent.name}/`);
-                                if(recursive) walk(full,`${prefix}${ent.name}/`);
-                              }
-                              else{
-                                lines.push(`${prefix}${ent.name}`);
-                              }
-            
-                        }
-                    }
-                    if(fs.statSync(abs).isDirectory())walk(abs,"");
-                    else lines.push(path.relative(this.config.codebasePath,abs));
-                    const out=lines.sort().join("/n");
-                    this.tracker.log({
-                        type:"code_analysis",
-                        path: this.norm(rel),
-                        details:{after:out,toolName:"list_files"},
-                        status:"executed",
-                    })
-                    return out || "(empty)";
-                    
-            
-                },
-                  searchFiles(
-                        rootRel:string,
-                        globPattern:string,
-                        contentQuery?:string
-                    ): string {
-                        this.assertNotExcluded(rootRel,"search_Files");
-                        const rootabs=this.resolveSafe(rootRel);
-                         if(!fs.existsSync(rootabs)){
-                            throw new Error(`search_Files:root not found:${rootRel}`)
-                
-                        }
-                
-                    const results:string[]=[];
-                    
-                    const regexFromGlob = (g: string): RegExp => {
-                      const escaped = g
-                        .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-                        .replace(/\*\*/g, "§§")
-                        .replace(/\*/g, "[^/\\\\]*")
-                        .replace(/§§/g, ".*")
-                        .replace(/\?/g, ".");
-                      return new RegExp(`^${escaped}$`, "i");
-                    };
-                    const nameRe = regexFromGlob(globPattern.replace(/\\/g, "/"));
-                
-                    const walk = (dir: string) => {
-                      for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-                        const full = path.join(dir, ent.name);
-                        const relP = path
-                          .relative(this.config.codebasePath, full)
-                          .split(path.sep)
-                          .join("/");
-                        if (this.excluded(relP)) continue;
-                        if (ent.isDirectory()) walk(full);
-                        else if (nameRe.test(relP) || nameRe.test(ent.name)) {
-                          if (contentQuery) {
-                            if (!isProbablyTextFile(full)) continue;
-                            const text = fs.readFileSync(full, "utf8");
-                            if (!text.includes(contentQuery)) continue;
-                          }
-                          results.push(relP);
-                        }
-                
-                      }
-                    };
-                    
-                     if (fs.statSync(rootabs).isDirectory()) walk(rootabs);
-                    else {
-                      const relP = path
-                        .relative(this.config.codebasePath, rootabs)
-                        .split(path.sep)
-                        .join("/");
-                      results.push(relP);
-                    }
-                
-                    const out = [...new Set(results)].sort().join("\n");
-                    this.tracker.log({
-                      type: "code_analysis",
-                      path: this.norm(rootRel),
-                      details: { after: out || "(no matches)", toolName: "search_files" },
-                      status: "executed",
-                    });
-                    return out || "(no matches)";
-                  },
-                
-                
-                  analyzeCodebase(rootRel: string): string {
-                    const rootAbs = this.resolveSafe(rootRel);
-                    if (!fs.existsSync(rootAbs))
-                      throw new Error(`analyze_codebase: not found: ${rootRel}`);
-                
-                    let files = 0;
-                    let dirs = 0;
-                    const walk = (dir: string) => {
-                      for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-                        const full = path.join(dir, ent.name);
-                        const relP = path.relative(this.config.codebasePath, full);
-                        if (this.excluded(relP)) continue;
-                        if (ent.isDirectory()) {
-                          dirs++;
-                          walk(full);
-                        } else {
-                          files++;
-                        }
-                      }
-                    };
-                    if (fs.statSync(rootAbs).isDirectory()) walk(rootAbs);
-                    else files = 1;
-                
-                    const summary = `Files: ${files} | Directories: ${dirs}`;
-                    this.tracker.log({
-                      type: "code_analysis",
-                      path: this.norm(rootRel),
-                      details: { after: summary, toolName: "analyze_codebase" },
-                      status: "executed",
-                    });
-                    return summary;
-                  },
-                  
-                    listSkills(): string {
-                      const lines: string[] = [];
-                      for (const root of this.skillRoots()) {
-                        if (!fs.existsSync(root)) continue;
-                        const walk = (dir: string) => {
-                          for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-                            const full = path.join(dir, ent.name);
-                            if (ent.isDirectory()) walk(full);
-                            else if (ent.name === "SKILL.md") lines.push(full);
-                          }
-                        };
-                        walk(root);
-                      }
-                      const out = lines.sort().join("\n");
-                      this.tracker.log({
-                        type: "code_analysis",
-                        path: "skills",
-                        details: { after: out || "(none)", toolName: "list_skills" },
-                        status: "executed",
-                      });
-                      return out || "(none)";
-                    },
-                  
-                    readSkill(skillPath: string): string {
-                      const abs = path.isAbsolute(skillPath)
-                        ? path.normalize(skillPath)
-                        : path.normalize(path.resolve(this.config.codebasePath, skillPath));
-                      const allowed = this.skillRoots().some((root) => {
-                        const r = path.resolve(root);
-                        return abs === r || abs.startsWith(r + path.sep);
-                      });
-                      if (!allowed) throw new Error("read_skill: outside skill roots");
-                      const text = fs.readFileSync(abs, "utf8");
-                      this.tracker.log({
-                        type: "code_analysis",
-                        path: abs,
-                        details: { after: text, toolName: "read_skill" },
-                        status: "executed",
-                      });
-                      return text;
-                    },
-                  
+                 read_file: tool({
+            description:
+                "Read a text from a workspace. Use a path relative to the project root.",
+            inputSchema: z.object({
+                path: z.string().describe("Relative file path")
+            }),
+            execute: async ({ path: p }) => executor.readFile(p),
+        }),
+           list_files: tool({
+      description: "List files and directories under a path.",
+      inputSchema: z.object({
+        path: z.string(),
+        recursive: z.boolean().optional().default(false),
+      }),
+      execute: async ({ path: p, recursive }) =>
+        executor.listFiles(p, recursive),
+    }),
+        search_files: tool({
+      description:
+        'Find files matching a glob pattern (e.g. "*.ts", "**/*.md"). Optional content substring filter.',
+      inputSchema: z.object({
+        root: z.string().describe("Directory to search, relative to root"),
+        pattern: z
+          .string()
+          .describe("Glob-like pattern using * and ** (forward slashes)"),
+        content_contains: z.string().optional(),
+      }),
+      execute: async ({ root, pattern, content_contains }) =>
+        executor.searchFiles(root, pattern, content_contains),
+    }),
+      analyze_codebase: tool({
+      description:
+        "Summarize structure: file counts, size, extensions. Read-only.",
+      inputSchema: z.object({
+        path: z.string().default("."),
+      }),
+      execute: async ({ path: p }) => executor.analyzeCodebase(p),
+    }),
+       list_skills: tool({
+      description:
+        "List absolute paths to SKILL.md files under configured skill directories (Cursor / Claude).",
+      inputSchema: z.object({}),
+      execute: async () => executor.listSkills(),
+    }),
+     read_skill: tool({
+      description:
+        "Read a SKILL.md file. Path must be absolute and under skill roots, or use a path returned by list_skills.",
+      inputSchema: z.object({
+        path: z.string(),
+      }),
+      execute: async ({ path: p }) => executor.readSkill(p),
+    }),
     }
 }
+function asMd(question: string, answer: string): string {
+  return `# Ask Mode\n\n## Question\n\n${question.trim()}\n\n## Answer\n\n${answer.trim()}\n`;
+}
+
 export async function runAskMode(){
-    console.log(chalk.bold("\n ASk Mode\n"));
+    console.log(chalk.bold("\n❓ASk Mode\n"));
+    const question=await text({message:"What do you want to ask?."});
+    if(isCancel(question)|| !question.trim()){
+      return;
+ }
+    const config=defaultAgentConfig();
+    config.tools.allowFileCreation=true;
+    config.tools.allowFileModification=false;
+    config.tools.allowFolderCreation=false;
+    config.tools.allowShellExecution=false;
+    const tracker=new ActionTracker();
+    const executor=new ToolExecutor(tracker,config);
+    //TODO:websearch (firecrawl)
+    const tools={
+      ...createAskTools(executor),
+
+    }
+    const agent=new ToolLoopAgent({
+        model:getAgentModel(),
+        stopWhen:stepCountIs(20),
+        tools,
+    });
+
+    const result=await agent.generate({prompt:question.trim()});
+    const answer=result.text?.trim() ||"(no answer)";
+    console.log("\n"+renderTerminalMarkdown(answer)+"\n");
+    const wantsSave=await confirm({message:"save this answer to a  .md file in the current directory",
+      initialValue:false
+    })
+    if(isCancel(wantsSave)|| !wantsSave) return;
+
+    const filename= await text({
+      message:"filename",
+      initialValue:"ask.md",
+      validate:(v)=>{
+        const s=(v?? '').trim();
+        if(!s) return 'Required';
+        if(s.includes('..')|| s.includes('/')|| s.includes('\\')) return 'No paths';
+        if(!s.toLowerCase().endsWith('.md')) return 'Must end with .md';
+      },
+
+    })
+
+    if(isCancel(filename)) return;
+
+    executor.createFile(filename,asMd(question ,answer));
+    const ok=await runApprovalFlow(tracker)
+    if(!ok) return executor.clearStaging();
+    executor.applyApprovedFromTracker();
+    executor.clearStaging();
+    
 }

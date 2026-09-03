@@ -2,7 +2,7 @@ import { isCancel, text } from "@clack/prompts";
 import chalk from "chalk";
 import { defaultAgentConfig } from "./types";
 import { ActionTracker } from "./actionTracker";
-import { ToolExecuter } from "./ToolExecuter";
+import { ToolExecutor } from "./ToolExecutor";
 import { createAgentTools } from "./agentTool";
 import { stepCountIs, ToolLoopAgent } from "ai";
 import { getAgentModel } from "../../ai/ai.config";
@@ -28,9 +28,9 @@ export async function runAgentModel(){
     const tracker=new ActionTracker()
 
     //This is the thing that actually interacts with the filesystem.
-    const executer=new ToolExecuter(tracker, config)
+    const executor=new ToolExecutor(tracker, config)
     
-    const tools=createAgentTools(executer)
+    const tools=createAgentTools(executor)
   
     //ToolLoopAgent is specifically a abstraction class/API provided by Vercel's AI SDK
 // toolloop is like  think-> choose tool-> calltool->see reault-> think again-> choose another tool
@@ -68,8 +68,8 @@ export async function runAgentModel(){
      if (result.text?.trim()) console.log(renderTerminalMarkdown(result.text));
      
      const ok = await runApprovalFlow(tracker);
-      if(!ok) return executer.clearStaging();
-      const {errors}=executer.applyApprovedFromTracker();
+      if(!ok) return executor.clearStaging();
+      const {errors}=executor.applyApprovedFromTracker();
       if(errors.length){
         console.log(chalk.red("\n Some operation reported errors:\n"));
         for(const e of errors) console.log(chalk.red(` -${e}`))
@@ -78,7 +78,7 @@ export async function runAgentModel(){
         console.log(chalk.green("\n Applied.\n"))
     }
     // to free memory and avoid accidental re application of the same actions;
-    executer.clearStaging();
+    executor.clearStaging();
 
   
 
