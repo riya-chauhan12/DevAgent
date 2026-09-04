@@ -12,15 +12,15 @@ import { renderTerminalMarkdown } from "../../tui/terminal";
 
 //shape of one group of changes that the user will review
 interface ReviewGroup{
-    label:string,
-    actionIds:string[],
+    label:string, //src/app.ts (file_Create, file_modify)
+    actionIds:string[], //The IDs of the actions inside that group.
 
-    patch:string|null
+    patch:string|null // The actual diff If it's a folder creation then there is no before (NULL)
 }
 
 //all the actions that are pending for approval
 function groupPending(pending:ActionLog[]):ReviewGroup[]{
-    //action belonging to the same path will be grouped togetherfor review
+    //This is the main structure used for grouping.("a.ts" → [action1, action2])
 const bypath=new Map<string,ActionLog[]>();
 //holds shell commands
 const shells:ActionLog[]=[];
@@ -31,18 +31,26 @@ for(const a of pending){
         continue;
     }
     const key=a.path;
-    if(!bypath.has(key)) bypath.set(key, []);
+    //If this path doesn't have a group yet, create an empty array for it.
+    if(!bypath.has(key)) {
+    bypath.set(key, []);
     bypath.get(key)!.push(a);
+    }
 }
 
+// this will eventually contain final data to return
 const groups:ReviewGroup[]=[];
+//sorts them alphabetically by path So the review order becomes predictable.
 const pathEntries=[...bypath.entries()].sort(([a],[b])=>a.localeCompare(b),);
+
 for(const[p,acts]of pathEntries){
+    //sort action oldest<->newest
     const sorted=acts.sort(
         (a,b)=>a.timestamp.getTime()-b.timestamp.getTime()
     );
 
     const ids=sorted.map((x)=>x.id);
+    //every() asks: are all action u this group folder creation
    if (sorted.every((x) => x.type === "folder_create")) {
       groups.push({
         label: `Create folder: ${p}`,
@@ -51,8 +59,11 @@ for(const[p,acts]of pathEntries){
       });
       continue;
     }
+    //creating diff 
     const { before, after } = composeBeforeAfter(sorted);
+    //formatPatch() turns that into diff
     const patch = formatPatch(p, before, after);
+    //set remove duplicate
     const kinds = [...new Set(sorted.map((x) => x.type))].join(", ");
     groups.push({ label: `${p} (${kinds})`, actionIds: ids, patch });
   
@@ -125,3 +136,19 @@ return tracker.getAction().some((x)=>x.status==="approved");
     
 } 
 
+// AI makes changes
+//       ↓
+// ActionTracker stores them as "pending"
+//       ↓
+// approval.ts
+//       ↓
+// You decide:
+//    ├── Approve all
+//    ├── Review one by one
+//    └── Cancel
+//       ↓
+// ActionTracker status changes
+//       ↓
+// ToolExecutor.applyApprovedFromTracker()
+//       ↓
+// Actual files are changed
