@@ -5,24 +5,26 @@ import { Output,
     tool,
      wrapLanguageModel
  } from "ai";
+ import chalk from "chalk";
  import {z } from 'zod'
  import { getAgentModel } from "../../ai/ai.config";
  import { ActionTracker} from "../agent/actionTracker";
  import { defaultAgentConfig } from "../agent/types";
- import type { Plan,PlanStep } from "./types";
+ import type { PlanStep } from "./types";
+ import type { Plan } from "./types";
  import { ToolExecutor } from "../agent/ToolExecutor";
 
 
-  const palnSchema=z.object({
+  const planSchema=z.object({
     reseachSummary:z.string().optional(),
-    sterps:z
+    steps:z
     .array(
         z.object({
             title:z.string(),
             description: z.string(),
             hints:z.array(z.string()).optional(),
-            complexity:z.enum(['low','medium','high']).optional(),
-        })
+            complexity:z.enum(["low", "medium", "high"]).optional(),
+        }),
     )
     .min(1)
     .max(15),
@@ -137,9 +139,39 @@ const PLAN_INSTRUCTIONS=(codebase: string,hasWeb:boolean)=>
 
 ].join('\n');
 
-  export function async function generatePlan(goal:string){
+  export async function generatePlan(goal:string){
     const config=defaultAgentConfig();
     const tracker=new ActionTracker();
     const executor=new ToolExecutor(tracker,config);
 
- }
+    const hashWeb=false;
+    const model=wrapLanguageModel({
+      model:getAgentModel(),
+      middleware:extractJsonMiddleware()
+    })
+
+    //todo :add web search tools
+    const tools={...readOnlyTools(executor)}
+    console.log(chalk.cyan("\n🔍 Researching & drafting a plan...\n"))
+    const result=await generateText({
+      model,
+      tools,
+      stopWhen:stepCountIs(20),
+      system: PLAN_INSTRUCTIONS(config.codebasePath, hashWeb),
+      prompt:`User goal:${goal}`,
+      output:Output.object({schema:planSchema})
+    });
+    const validated=planSchema.parse(result.output);
+    const steps: PlanStep[] = validated.steps.map((s, i) => {
+      const complexity = (s.complexity ?? "medium").trim() as PlanStep["complexity"];
+
+      return {
+        id: `step-${i + 1}`,
+        title: s.title,
+        description: s.description,
+        hints: s.hints,
+        complexity,
+      };
+    });
+    return { goal, researchSummary: validated.reseachSummary, steps };
+  }
