@@ -13,6 +13,7 @@ import { Output,
  import type { PlanStep } from "./types";
  import type { Plan } from "./types";
  import { ToolExecutor } from "../agent/ToolExecutor";
+import { createWebTools } from "./web-tools";
 
 
   const planSchema=z.object({
@@ -144,14 +145,16 @@ const PLAN_INSTRUCTIONS=(codebase: string,hasWeb:boolean)=>
     const tracker=new ActionTracker();
     const executor=new ToolExecutor(tracker,config);
 
-    const hashWeb=false;
+    const hashWeb= !!process.env.FIRECRAWL_API_KEY;
     const model=wrapLanguageModel({
       model:getAgentModel(),
       middleware:extractJsonMiddleware()
     })
 
-    //todo :add web search tools
-    const tools={...readOnlyTools(executor)}
+
+   
+    const tools={...readOnlyTools(executor), ...(hashWeb ? createWebTools(tracker): {})}
+    
     console.log(chalk.cyan("\n🔍 Researching & drafting a plan...\n"))
     const result=await generateText({
       model,

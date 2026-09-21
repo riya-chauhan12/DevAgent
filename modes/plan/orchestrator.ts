@@ -13,6 +13,7 @@ import { selectSteps } from "./selection";
 import { printPlan } from "./selection";
 import { createAgentTools } from "../agent/agentTool";
 import type { PlanStep } from "./types";
+import { createWebTools } from "./web-tools";
 
 function stepPrompt(goal :string, step:PlanStep):string{
     return [`goal:${goal}`,`step:${step.title}`,step.description].join('\n');
@@ -34,10 +35,11 @@ export async function runPlanMode():Promise<void>{
     const config=defaultAgentConfig();
      const tracker=new ActionTracker();
       const executor=new ToolExecutor(tracker, config)
- const tools={
 
- ...createAgentTools(executor)
- }
+    const tools={
+    ...createAgentTools(executor),
+    ...createWebTools(tracker)
+    }
  for(const step of selected){
     console.log(chalk.bold(`\n 🛠️ ${step.title} \n`))
     const agent =new ToolLoopAgent({

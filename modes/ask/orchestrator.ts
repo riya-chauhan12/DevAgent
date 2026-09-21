@@ -11,6 +11,7 @@ import {getAgentModel} from '../../ai/ai.config';
 
 import fs from 'node:fs'
 import path from 'node:path'
+import { createWebTools } from '../plan/web-tools';
 function createAskTools(executor:ToolExecutor){
     return{
         
@@ -85,9 +86,10 @@ export async function runAskMode(){
     config.tools.allowShellExecution=false;
     const tracker=new ActionTracker();
     const executor=new ToolExecutor(tracker,config);
-    //TODO:websearch (firecrawl)
+   
     const tools={
       ...createAskTools(executor),
+      ...createWebTools(tracker)
 
     }
     const agent=new ToolLoopAgent({
