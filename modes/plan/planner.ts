@@ -159,7 +159,7 @@ const PLAN_INSTRUCTIONS=(codebase: string,hasWeb:boolean)=>
     const result=await generateText({
       model,
       tools,
-      stopWhen:stepCountIs(20),
+      stopWhen:stepCountIs(5),
       system: PLAN_INSTRUCTIONS(config.codebasePath, hashWeb),
       prompt:`User goal:${goal}`,
       output:Output.object({schema:planSchema})

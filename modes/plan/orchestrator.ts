@@ -44,7 +44,7 @@ export async function runPlanMode():Promise<void>{
     console.log(chalk.bold(`\n 🛠️ ${step.title} \n`))
     const agent =new ToolLoopAgent({
         model:getAgentModel(),
-        stopWhen:stepCountIs(30),
+        stopWhen:stepCountIs(5),
         tools
     });
     const r=await agent.generate({prompt:stepPrompt(plan.goal , step)})

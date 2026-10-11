@@ -94,7 +94,7 @@ export async function runAskMode(){
     }
     const agent=new ToolLoopAgent({
         model:getAgentModel(),
-        stopWhen:stepCountIs(20),
+        stopWhen:stepCountIs(5),
         tools,
     });
 

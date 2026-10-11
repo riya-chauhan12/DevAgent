@@ -38,7 +38,7 @@ export async function runAgentModel(){
         // call llm
         model : getAgentModel(),
         // prevent agent from running forever
-        stopWhen:stepCountIs(29),
+        stopWhen:stepCountIs(5),
         instructions:[
             `Workspace root:${config.codebasePath}`,
             `All mutation are stagged until approval.`,
