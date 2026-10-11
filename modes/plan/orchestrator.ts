@@ -32,6 +32,8 @@ export async function runPlanMode():Promise<void>{
         message :`Execute $ {selected.length} steps(s)`,
         initialValue:true
     });
+    if(isCancel(procceed)|| !procceed) return;
+
     const config=defaultAgentConfig();
      const tracker=new ActionTracker();
       const executor=new ToolExecutor(tracker, config)
@@ -48,7 +50,7 @@ export async function runPlanMode():Promise<void>{
         tools
     });
     const r=await agent.generate({prompt:stepPrompt(plan.goal , step)})
-    if(r.text) return console.log(renderTerminalMarkdown(r.text))
+    if(r.text?.trim()) console.log(renderTerminalMarkdown(r.text));
 }
 const ok =await runApprovalFlow(tracker);
 if(!ok) return executor.clearStaging();

@@ -35,9 +35,9 @@ export async function runWakeup(){
 
 let ascii:string;
 try{
-    ascii=figlet.textSync("openclaw",{font:BANNER_FONT})
+    ascii=figlet.textSync("DevAgent",{font:BANNER_FONT})
 } catch(error){
-    ascii=figlet.textSync("openclaw",{font:"Standard"})
+    ascii=figlet.textSync("DevAgent",{font:"Standard"})
 }
 
 printBannerWithShadow(ascii)
@@ -51,7 +51,7 @@ const mode= await select({
     ]
 });
 // if user cancel any mode
-if(isCancel(mode||mode==="exit")){
+if(isCancel(mode)||mode==="exit"){
    console.log(chalk.dim('\n Goodbye.\n'));
    return;
 }

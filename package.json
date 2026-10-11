@@ -1,10 +1,10 @@
 {
-  "name": "openclaw",
+  "name": "DevAgent",
   "module": "index.ts",
   "type": "module",
   "private": true,
   "bin": {
-    "OPENclaw-build": "./index.ts"
+    "DevAgent-build": "./index.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

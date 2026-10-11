@@ -2,8 +2,8 @@
 import { Command } from "commander";
 import { runWakeup } from "./tui/wakeup";
 const program= new Command()
-program.name("OPENclaw-build")
-.description("OPENclaw cli yt")
+program.name("DevAgent-build")
+.description("DevAgent cli ")
 .version("0.01")
 
 
