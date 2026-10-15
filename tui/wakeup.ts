@@ -1,9 +1,10 @@
 import {select ,isCancel} from "@clack/prompts"
+import { runTelegramMode } from "../modes/telegram/index";
 import chalk from "chalk"
 import figlet from "figlet"
 
 import { runCliMode } from "../modes/cli";
-const BANNER_FONT='ANSI shadow';
+const BANNER_FONT = 'ANSI Shadow';
 const SHADOW=chalk.hex('#53459a')
 const FACE=chalk.hex('#d3baf5').bold
 
@@ -58,10 +59,11 @@ if(isCancel(mode)||mode==="exit"){
 //now options fucntionality
 if(mode==="cli"){
     await runCliMode();
-    console.log(chalk.dim("starting cli mode........."))
+    
 }
 else if(mode=="telegram"){
-    console.log(chalk.dim("starting telegram"))
+    console.log(chalk.dim("starting telegram..."))
+      await runTelegramMode();
 }
 
 }

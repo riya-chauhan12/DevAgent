@@ -12,10 +12,10 @@ import {getAgentModel} from '../../ai/ai.config';
 import fs from 'node:fs'
 import path from 'node:path'
 import { createWebTools } from '../plan/web-tools';
+
 function createAskTools(executor:ToolExecutor){
     return{
-        
-                 read_file: tool({
+            read_file: tool({
             description:
                 "Read a text from a workspace. Use a path relative to the project root.",
             inputSchema: z.object({
@@ -89,12 +89,13 @@ export async function runAskMode(){
    
     const tools={
       ...createAskTools(executor),
-      ...createWebTools(tracker)
+      ...(process.env.FIRECRAWL_API_KEY ? createWebTools(tracker) : {}),
 
     }
     const agent=new ToolLoopAgent({
         model:getAgentModel(),
-        stopWhen:stepCountIs(5),
+        stopWhen:stepCountIs(20),
+        instructions: `You are a read-only code assistant. Workspace: ${config.codebasePath}. Answer concisely.`,
         tools,
     });
 
@@ -119,11 +120,16 @@ export async function runAskMode(){
     })
 
     if(isCancel(filename)) return;
-
-    executor.createFile(filename,asMd(question ,answer));
-    const ok=await runApprovalFlow(tracker)
-    if(!ok) return executor.clearStaging();
-    executor.applyApprovedFromTracker();
-    executor.clearStaging();
+    try {
+  executor.createFile(filename, asMd(question, answer));
+} catch (e) {
+  console.log(chalk.red(`\n${(e as Error).message}\n`));
+  return;
+}
+const ok = await runApprovalFlow(tracker)
+if (!ok) return executor.clearStaging();
+const { errors } = executor.applyApprovedFromTracker();
+if (errors.length) errors.forEach((e) => console.log(chalk.red(` - ${e}`)));
+executor.clearStaging()
     
 }

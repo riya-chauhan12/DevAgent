@@ -7,7 +7,7 @@ import { renderTerminalMarkdown } from '../../tui/terminal.ts';
 const COMPLEXITY_COLOR: Record<NonNullable<PlanStep['complexity']>, string> = {
   low: chalk.green('low'),
   medium: chalk.yellow('medium'),
-  'high ': chalk.red('high'),
+  high: chalk.red('high'),
 };
 
 

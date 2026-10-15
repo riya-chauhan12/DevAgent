@@ -5,8 +5,8 @@ import { homedir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import type { ActionLog, AgentConfig } from './types'
 import { ActionTracker } from './actionTracker'
-import { dir } from 'node:console'
-import { OpenRouterImageModel } from '@openrouter/ai-sdk-provider/internal'
+//import { dir } from 'node:console'
+//import { OpenRouterImageModel } from '@openrouter/ai-sdk-provider/internal'
 
 //Keep a list of file extensions that we consider to be text files
 const TEXT_EXT=new Set([
@@ -60,7 +60,7 @@ export class ToolExecutor{
         const abs=path.resolve(this.config.codebasePath,rel);
         const root= path.resolve(this.config.codebasePath);
         const relCheck=path.relative(root,abs);
-        if(relCheck.startsWith('..')||path.isAbsolute(relCheck)){
+        if(relCheck.startsWith('..')||relCheck.startsWith('..' + path.sep) ||path.isAbsolute(relCheck)){
             throw new Error(`path escapes workspace ${rel}`);
         }
         return abs;
@@ -119,27 +119,21 @@ export class ToolExecutor{
 
     }
 
-    readFile(rel:string) :string {
-        this.assertNotExcluded(rel,'read_file')
-        const abs=this.resolveSafe(rel);
-        if(!fs.existsSync(abs) ||!fs.statSync(abs).isFile()){
-            throw new Error(`File not found ${rel}`)
-        }
-        const st=fs.statSync(abs);
-        if(st.size>this.config.maxFileSizeToRead){
-            throw new Error(`file too larage :${rel}`)
-
-        }
-        const text= fs.readFileSync(abs,"utf8");
-         this.tracker.log({
-            type:"code_analysis",
-            path:this.norm(rel),
-            details:{after:text,toolName:"read_file"},
-            status:"executed",
-         })
-
-         return text;
+    readFile(rel: string): string {
+    this.assertNotExcluded(rel, 'read_file')
+    const text = this.getEffectiveText(rel);
+    if (text === undefined) throw new Error(`File not found ${rel}`)
+    if (Buffer.byteLength(text) > this.config.maxFileSizeToRead) {
+        throw new Error(`file too large: ${rel}`)
     }
+    this.tracker.log({
+        type: "code_analysis",
+        path: this.norm(rel),
+        details: { after: text, toolName: "read_file" },
+        status: "executed",
+    })
+    return text;
+  }
 
      createFile(rel:string,content:string) :string {
 
@@ -208,7 +202,7 @@ export class ToolExecutor{
     }
 
     createFolder(rel:string):string{
-        if(!this.config.tools.allowFileCreation){
+        if(!this.config.tools.allowFolderCreation){
             throw new Error("folder creation disabled");
             
         }
@@ -247,7 +241,7 @@ export class ToolExecutor{
         }
         if(fs.statSync(abs).isDirectory())walk(abs,"");
         else lines.push(path.relative(this.config.codebasePath,abs));
-        const out=lines.sort().join("/n");
+        const out=lines.sort().join("\n");
         this.tracker.log({
             type:"code_analysis",
             path: this.norm(rel),
@@ -484,27 +478,34 @@ export class ToolExecutor{
     }
 
 //All approved tool_execute actions(like nom install ,npm test etc) are executed in the order they were approvved
+    
+        // run approved shell commands in the order they were approved
     for (const a of all.filter(
       (x) => x.type === "tool_execute" && x.status === "approved",
     )) {
-
       const cmd = a.details.command;
-      // if cmd doesnt exit skip  the iteration
       if (!cmd) continue;
-      // this part run terminal command
+
       const r = spawnSync(cmd, {
         shell: true,
         cwd: this.config.codebasePath,
         encoding: "utf8",
         maxBuffer: 16 * 1024 * 1024,
       });
-      if (r.status && r.status !== 0)
-        errors.push(`shell exit ${r.status}: ${cmd}`);
+
+      if (r.error) {
+        errors.push(`shell failed to start: ${cmd} (${r.error.message})`);
+      } else if (r.status !== 0) {
+        errors.push(
+          `shell exit ${r.status}: ${cmd}\n${(r.stderr || r.stdout || "").slice(0, 2000)}`,
+        );
+      } else if (r.stdout?.trim()) {
+        console.log(r.stdout);
+      }
     }
 
     return { errors };
   }
-
 
   clearStaging():void{
     this.overlay.clear()

@@ -3,7 +3,8 @@ import { Output,
     generateText,
     stepCountIs,
     tool,
-     wrapLanguageModel
+     wrapLanguageModel,
+     
  } from "ai";
  import chalk from "chalk";
  import {z } from 'zod'
@@ -17,19 +18,23 @@ import { createWebTools } from "./web-tools";
 
 
   const planSchema=z.object({
-    reseachSummary:z.string().optional(),
-    steps:z
+    researchSummary: z.string().optional(),
+  steps: z
     .array(
-        z.object({
-            title:z.string(),
-            description: z.string(),
-            hints:z.array(z.string()).optional(),
-            complexity:z.enum(["low", "medium", "high"]).optional(),
-        }),
+      z.object({
+        title: z.string(),
+        description: z.string(),
+        hints: z.array(z.string()).optional(),
+        complexity: z.enum(["low", "medium", "high"]).optional(),
+      }),
     )
     .min(1)
     .max(15),
-  })
+});
+
+
+type PlanJson = z.infer<typeof planSchema>;
+
 function readOnlyTools(executor:ToolExecutor){
     return {
         read_file: tool({
@@ -40,38 +45,7 @@ function readOnlyTools(executor:ToolExecutor){
             }),
             execute: async ({ path: p }) => executor.readFile(p),
         }),
-        create_file: tool({
-            description: "Stage creation of new file (not written until the user approves).",
-            inputSchema: z.object({
-                path: z.string(),
-                content: z.string(),
-            }),
-            execute: async ({ path: p, content }) => executor.createFile(p, content),
-        }),
-
-        modify_file:tool({
-            description:"Stage a fukk-file replacement for an existing file(pending approval).",
-            inputSchema:z.object({
-                path:z.string(),
-                content:z.string().describe('Complete new file contents'),
-            }),
-            execute: async ({path:p,content})=> executor.modifyFile(p,content),
-        }),
-        delete_file:tool({
-            description: "Stage deletion of a file(pending approval).",
-            inputSchema:z.object({
-                path:z.string(),
-            }),
-            execute: async({path:p})=>executor.DeleteFile(p)
-        }),
-        create_folder: tool({
-      description:
-        "Stage creation of a directory tree (pending approval). Uses mkdir -p on apply.",
-      inputSchema: z.object({
-        path: z.string().describe("Relative directory path"),
-      }),
-      execute: async ({ path: p }) => executor.createFolder(p),
-    }),
+       
       list_files: tool({
       description: "List files and directories under a path.",
       inputSchema: z.object({
@@ -81,6 +55,7 @@ function readOnlyTools(executor:ToolExecutor){
       execute: async ({ path: p, recursive }) =>
         executor.listFiles(p, recursive),
     }),
+
       search_files: tool({
       description:
         'Find files matching a glob pattern (e.g. "*.ts", "**/*.md"). Optional content substring filter.',
@@ -94,6 +69,7 @@ function readOnlyTools(executor:ToolExecutor){
       execute: async ({ root, pattern, content_contains }) =>
         executor.searchFiles(root, pattern, content_contains),
     }),
+
     analyze_codebase: tool({
       description:
         "Summarize structure: file counts, size, extensions. Read-only.",
@@ -101,14 +77,6 @@ function readOnlyTools(executor:ToolExecutor){
         path: z.string().default("."),
       }),
       execute: async ({ path: p }) => executor.analyzeCodebase(p),
-    }),
-execute_shell: tool({
-      description:
-        "Queue a shell command to run in the workspace after user approval. Use with care.",
-      inputSchema: z.object({
-        command: z.string().describe("Single command; runs with shell: true"),
-      }),
-      execute: async ({ command }) => executor.queueShell(command),
     }),
     list_skills: tool({
       description:
@@ -127,54 +95,95 @@ execute_shell: tool({
 
     };
 }
-const PLAN_INSTRUCTIONS=(codebase: string,hasWeb:boolean)=>
-[
+
+function extractJson(text: string): string {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced?.[1] ?? text;
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+  if (start === -1 || end <= start) throw new Error("No JSON object found in model reply");
+  return candidate.slice(start, end + 1);
+}
+ 
+const JSON_ONLY_SYSTEM = [
+  "You turn research notes into a plan.",
+  "Reply with ONLY a JSON object. No markdown, no explanation, no code fences.",
+  'Shape: {"researchSummary": string, "steps": [{"title": string, "description": string, "hints": string[], "complexity": "low" | "medium" | "high"}]}',
+  "1 to 15 steps.",
+].join("\n");
+
+const PLAN_INSTRUCTIONS = (codebase: string, hasWeb: boolean) =>
+  [
     "You are a Plan-Mode planner. You DO NOT modify files.",
     `Workspace: ${codebase}`,
-    "Use read-only tools for codebase/skills research.",
+    "Use the read-only tools to inspect the real codebase before answering. Do not guess.",
     hasWeb
       ? "Web tools are available (web_search/web_crawl/fetch_url). Use only when needed."
       : "Web tools are unavailable (no FIRECRAWL_API_KEY).",
-    "Output must match the provided JSON schema.",
-    "Keep it short: 1–15 steps.",
+    "When you have enough information, write short research notes in plain text.",
+  ].join("\n");
+  
 
-].join('\n');
-
-  export async function generatePlan(goal:string){
-    const config=defaultAgentConfig();
-    const tracker=new ActionTracker();
-    const executor=new ToolExecutor(tracker,config);
-
-    const hashWeb= !!process.env.FIRECRAWL_API_KEY;
-    const model=wrapLanguageModel({
-      model:getAgentModel(),
-      middleware:extractJsonMiddleware()
-    })
-
-
-   
-    const tools={...readOnlyTools(executor), ...(hashWeb ? createWebTools(tracker): {})}
-    
-    console.log(chalk.cyan("\n🔍 Researching & drafting a plan...\n"))
-    const result=await generateText({
-      model,
-      tools,
-      stopWhen:stepCountIs(5),
-      system: PLAN_INSTRUCTIONS(config.codebasePath, hashWeb),
-      prompt:`User goal:${goal}`,
-      output:Output.object({schema:planSchema})
+  export async function generatePlan(goal: string) {
+  const config = defaultAgentConfig();
+  const tracker = new ActionTracker();
+  const executor = new ToolExecutor(tracker, config);
+ 
+  const hasWeb = !!process.env.FIRECRAWL_API_KEY;
+  const tools = { ...readOnlyTools(executor), ...(hasWeb ? createWebTools(tracker) : {}) };
+ 
+  console.log(chalk.cyan("\n🔍 Researching the codebase...\n"));
+ 
+  // Phase 1: research with tools, plain text out (no structured output here,
+  // many models cannot do tools + JSON schema in the same call)
+  const research = await generateText({
+    model: getAgentModel(),
+    tools,
+    stopWhen: stepCountIs(15),
+    system: PLAN_INSTRUCTIONS(config.codebasePath, hasWeb),
+    prompt: `User goal: ${goal}\n\nInspect the codebase with the tools, then write short research notes.`,
+  });
+  const notes = research.text?.trim() || "(no notes)";
+ 
+  console.log(chalk.cyan("📝 Drafting the plan...\n"));
+ 
+  const prompt = `User goal: ${goal}\n\nResearch notes:\n${notes}`;
+  let validated: PlanJson | undefined;
+ 
+  // Phase 2a: structured output (works on models that support response_format)
+  try {
+    const r = await generateText({
+      model: wrapLanguageModel({ model: getAgentModel(), middleware: extractJsonMiddleware() }),
+      system: JSON_ONLY_SYSTEM,
+      prompt,
+      output: Output.object({ schema: planSchema }),
     });
-    const validated=planSchema.parse(result.output);
-    const steps: PlanStep[] = validated.steps.map((s, i) => {
-      const complexity = (s.complexity ?? "medium").trim() as PlanStep["complexity"];
-
-      return {
-        id: `step-${i + 1}`,
-        title: s.title,
-        description: s.description,
-        hints: s.hints,
-        complexity,
-      };
-    });
-    return { goal, researchSummary: validated.reseachSummary, steps };
+    validated = planSchema.parse(r.output);
+  } catch {
+    // Phase 2b: fallback, ask for plain JSON text and parse it ourselves
+    try {
+      const r = await generateText({
+        model: getAgentModel(),
+        system: JSON_ONLY_SYSTEM,
+        prompt,
+      });
+      validated = planSchema.parse(JSON.parse(extractJson(r.text)));
+    } catch (e) {
+      throw new Error(
+        `The model "${process.env.OPENROUTER_DEFAULT_MODEL}" did not return a valid plan. ` +
+          `Try a stronger model in .env. (${(e as Error).message})`,
+      );
+    }
   }
+ 
+  const steps: PlanStep[] = validated.steps.map((s, i) => ({
+    id: `step-${i + 1}`,
+    title: s.title,
+    description: s.description,
+    hints: s.hints,
+    complexity: s.complexity ?? "medium",
+  }));
+ 
+  return { goal, researchSummary: validated.researchSummary, steps };
+}
+ 

@@ -7,10 +7,11 @@ import type { ActionTracker } from '../agent/actionTracker'
 let client:Firecrawl |null=null;
 function getClient(): Firecrawl{
     if(client) return client;
-    client=new Firecrawl({
-        apiKey:process.env.FIRECRAWL_API_KEY,
-    })
-return client;
+     const apiKey = process.env.FIRECRAWL_API_KEY?.trim();
+      if (!apiKey) throw new Error("FIRECRAWL_API_KEY is not set");
+     client = new Firecrawl({ apiKey });
+    return client;
+
 }
 
 //slice the result
@@ -33,14 +34,14 @@ export function createWebTools(tracker:ActionTracker){
                     const title=('title' in d && d.title)|| '(untitled)';
                     const url=('url' in d&& d.url)|| '';
                     const snip=('snippet' in d && d.snippet) || '';
-                    return '${i+1}.${title}\n ${url}\n ${snip}';
+                    return `${i+1}.${title}\n ${url}\n ${snip}`;
     
 
                 }).join('\n\n') ||'(no result)'
                  tracker.log({
                     type:"code_analysis",
-                    path:'web_search:${query}',
-                    details:{after:out, toolName:"wen_search"},
+                    path:`web_search:${query}`,
+                    details:{after:out, toolName:"web_search"},
                     status:"executed",
                  })
                  return clip(out);
@@ -55,8 +56,8 @@ export function createWebTools(tracker:ActionTracker){
                 const md=(doc as {markdown?:string}).markdown?? '';
                 tracker.log({
                     type:'code_analysis',
-                    path:`web_crawl:4{url}`,
-                    details:{after: clip(md),toolName:' web_crawl'},
+                    path:`web_crawl:${url}`,
+                    details:{after: clip(md),toolName:'web_crawl'},
                     status:'executed',
                 });
                 return clip(md) ||'(empty)';

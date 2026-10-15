@@ -6,7 +6,7 @@ import { ToolExecutor } from "./ToolExecutor";
 import { createAgentTools } from "./agentTool";
 import { stepCountIs, ToolLoopAgent } from "ai";
 import { getAgentModel } from "../../ai/ai.config";
-import { convertArrayToReadableStream } from "ai/test";
+//import { convertArrayToReadableStream } from "ai/test";
 import { renderTerminalMarkdown } from "../../tui/terminal";
 import { runApprovalFlow } from "./approval";
 
@@ -38,10 +38,10 @@ export async function runAgentModel(){
         // call llm
         model : getAgentModel(),
         // prevent agent from running forever
-        stopWhen:stepCountIs(5),
+        stopWhen:stepCountIs(40),
         instructions:[
             `Workspace root:${config.codebasePath}`,
-            `All mutation are stagged until approval.`,
+            `All mutation are stagged until approval.When done, reply with a short summary of what you staged.`,
 
         ].join("\n"),
         tools,

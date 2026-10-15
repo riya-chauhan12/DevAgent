@@ -54,10 +54,14 @@ export const defaultAgentConfig=() : AgentConfig=>({
 codebasePath:process.cwd(),//(current working directory)
 maxFileSizeToRead:1024*1024,
 excludePatterns: [
-    'node_modules',
+     'node_modules',
     '.git',
-    'build',
+    'dist',
     '.next',
+    'env',
+    'venv',
+    '.venv',
+    '__pycache__',
     '*.log',
     '.env',
 

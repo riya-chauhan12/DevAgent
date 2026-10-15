@@ -3,7 +3,7 @@ export interface PlanStep{
     title:string;
     description: string;
     hints?: string[];
-    complexity?: 'low'| 'medium'| 'high ';
+    complexity?: 'low' | 'medium' | 'high';
 }
 export interface Plan{
     goal:string;

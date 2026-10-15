@@ -29,7 +29,7 @@ export async function runPlanMode():Promise<void>{
     const selected=await selectSteps(plan)
     if(selected.length===0) return ;
     const procceed =await confirm({
-        message :`Execute $ {selected.length} steps(s)`,
+        message :`Execute $ {selected.length} steps(s)?`,
         initialValue:true
     });
     if(isCancel(procceed)|| !procceed) return;
@@ -46,7 +46,7 @@ export async function runPlanMode():Promise<void>{
     console.log(chalk.bold(`\n 🛠️ ${step.title} \n`))
     const agent =new ToolLoopAgent({
         model:getAgentModel(),
-        stopWhen:stepCountIs(5),
+        stopWhen:stepCountIs(20),
         tools
     });
     const r=await agent.generate({prompt:stepPrompt(plan.goal , step)})
@@ -56,10 +56,10 @@ const ok =await runApprovalFlow(tracker);
 if(!ok) return executor.clearStaging();
 const { errors }= executor.applyApprovedFromTracker();
 if(errors.length){
-    console.log(chalk.red('\nSome operations reported errors :\n'));
-    for(const e of errors) console.log(chalk.red(` .${e}`));
+    console.log(chalk.red('\nSome operations reported errors:\n'));
+    for(const e of errors) console.log(chalk.red(` -${e}`));
 }else{
-    for(const e of errors) console.log(chalk.green('\n✔️ Applied \n'))
+ console.log(chalk.green('\n✔️ Applied\n'));
     }
 executor.clearStaging();
 

@@ -70,7 +70,7 @@ export async function runAsk(ctx:{reply:(t:string , o?:object)=>Promise<unknown>
   const executor = new ToolExecutor(tracker, config);
   const tools = { ...createReadOnlyTools(executor), ...extraWebTools(tracker) };
   const agent = new ToolLoopAgent({
-    ...agentOptions(config, 5),
+    ...agentOptions(config, 20),
     tools,
   });
 

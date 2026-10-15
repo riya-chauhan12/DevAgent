@@ -1,4 +1,5 @@
-import { isCancel } from "@clack/core";
+
+import { isCancel} from "@clack/core";
 import { select } from "@clack/prompts";
 
 import type { ActionTracker } from "./actionTracker";
@@ -31,11 +32,10 @@ for(const a of pending){
         continue;
     }
     const key=a.path;
+    const list = bypath.get(key) ?? [];
     //If this path doesn't have a group yet, create an empty array for it.
-    if(!bypath.has(key)) {
-    bypath.set(key, []);
-    bypath.get(key)!.push(a);
-    }
+    list.push(a);
+    bypath.set(key, list);
 }
 
 // this will eventually contain final data to return

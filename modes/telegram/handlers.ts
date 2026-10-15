@@ -6,37 +6,48 @@ import { planKeyboard, planMessage, planSessions, refreshPlanUi, type PlanSessio
 import { runAgent,runAsk,runPlanSteps } from "./agent-run";
 import { generatePlan } from "../plan/planner";
 import { approvalSessions,approvalDiff} from "./approval-seesion";
+
+function reportError(ctx: { reply: (t: string) => Promise<unknown> }) {
+  return async (e: unknown) => {
+    console.error(e);
+    try {
+      await ctx.reply(`❌ Error: ${String(e).slice(0, 500)}`);
+    } catch {
+     
+    }
+  };
+}
 export function registerHandlers(bot:Telegraf){
     bot.command("start",async(ctx)=>{
-        if(!isOwner(ctx.chat.id)) return;
+        if(!isOwner(ctx.from?.id)) return;
         await ctx.reply(WELCOME, {parse_mode:"Markdown"})
 
     });
      bot.command("ask",async(ctx)=>{
-        if(!isOwner(ctx.chat.id)) return;
+        if(!isOwner(ctx.from?.id)) return;
         const q=commandArg(ctx.message.text,"ask");
         if(!q) return  ctx.reply("Usage:`/ask ,your question>`",{
             parse_mode:"Markdown",
         }) 
 
-        await ctx.reply( `researching your question...`);
-        void runAsk(ctx,q).catch(console.error)
+        await ctx.reply( "researching your question...");
+        void runAsk(ctx,q).catch(reportError(ctx));
 
      });
 
   bot.command("agent", async (ctx) => {
-    if (!isOwner(ctx.chat.id)) return;
+    if (!isOwner(ctx.from?.id)) return;
     const goal = commandArg(ctx.message.text, "agent");
     if (!goal)
       return ctx.reply("Usage: `/agent <task description>`", {
         parse_mode: "Markdown",
       });
     await ctx.reply("🤖 Agent is working on your task…");
-    void runAgent(ctx, ctx.chat.id, goal).catch(console.error);
+    void runAgent(ctx, ctx.chat.id, goal).catch(reportError(ctx));
   });
 
    bot.command("plan", async (ctx) => {
-    if (!isOwner(ctx.chat.id)) return;
+    if (!isOwner(ctx.from?.id)) return;
     const goal = commandArg(ctx.message.text, "plan");
 
     if (!goal)
@@ -51,11 +62,11 @@ export function registerHandlers(bot:Telegraf){
         const session:PlanSession = {plan , selected:new Set(plan.steps.map((s)=>s.id))}
         await ctx.reply(planMessage(session) , {parse_mode:"Markdown", ...planKeyboard(session)});
          planSessions.set(ctx.chat.id, session);
-    })().catch(console.error)
+    })().catch(reportError(ctx));
   });
 
    bot.action(/^plan_toggle:(.+)$/, async (ctx) => {
-    if (!isOwner(ctx.chat!.id)) return ctx.answerCbQuery();
+    if (!isOwner(ctx.from?.id)) return ctx.answerCbQuery();
     const s = planSessions.get(ctx.chat!.id);
     if (!s) return ctx.answerCbQuery();
 
@@ -77,7 +88,7 @@ export function registerHandlers(bot:Telegraf){
   });
 
 bot.action('plan_none', async (ctx) => {
-    if (!isOwner(ctx.chat!.id)) return ctx.answerCbQuery();
+    if (!isOwner(ctx.from?.id)) return ctx.answerCbQuery();
     const s = planSessions.get(ctx.chat!.id);
     if (!s) return ctx.answerCbQuery();
     s.selected.clear();
@@ -88,7 +99,7 @@ bot.action('plan_none', async (ctx) => {
 
 
   bot.action('plan_proceed', async (ctx) => {
-    if (!isOwner(ctx.chat!.id)) return ctx.answerCbQuery();
+    if (!isOwner(ctx.from?.id)) return ctx.answerCbQuery();
     const s = planSessions.get(ctx.chat!.id);
     if (!s) return ctx.answerCbQuery();
 
@@ -101,11 +112,11 @@ bot.action('plan_none', async (ctx) => {
     await ctx.editMessageText(`🚀 Executing ${steps.length} step(s)…\n\n${list}`);
     await ctx.answerCbQuery();
 
-    void runPlanSteps(ctx, ctx.chat!.id, plan, steps).catch(console.error);
+    void runPlanSteps(ctx, ctx.chat!.id, plan, steps).catch(reportError(ctx));
   });
 
   bot.action('approval_diff', async (ctx) => {
-    if (!isOwner(ctx.chat!.id)) return ctx.answerCbQuery();
+    if (!isOwner(ctx.from?.id)) return ctx.answerCbQuery();
     const s = approvalSessions.get(ctx.chat!.id);
     if (!s) return ctx.answerCbQuery();
     await ctx.answerCbQuery();
@@ -114,7 +125,7 @@ bot.action('plan_none', async (ctx) => {
 
   
   bot.action('approval_accept', async (ctx) => {
-    if (!isOwner(ctx.chat!.id)) return ctx.answerCbQuery();
+    if (!isOwner(ctx.from?.id)) return ctx.answerCbQuery();
     const s = approvalSessions.get(ctx.chat!.id);
     if (!s) return ctx.answerCbQuery();
 
@@ -123,21 +134,31 @@ bot.action('plan_none', async (ctx) => {
     const { errors } = s.executor.applyApprovedFromTracker();
     s.executor.clearStaging();
 
+     if (errors.length) {
+      console.error(errors);
+      await ctx.editMessageText(
+        clip(`⚠️ Applied with errors:\n\n${errors.join("\n")}`, 3500),
+      );
+      await ctx.answerCbQuery("Applied with errors");
+    } else {
+
     await ctx.editMessageText('✅ All changes applied.');
     await ctx.answerCbQuery('Applied!');
-    if (errors.length) console.error(errors);
+    
+    }
   });
 
   bot.action('approval_reject', async (ctx) => {
-    if (!isOwner(ctx.chat!.id)) return ctx.answerCbQuery();
+    if (!isOwner(ctx.from?.id)) return ctx.answerCbQuery();
     const s = approvalSessions.get(ctx.chat!.id);
     if (!s) return ctx.answerCbQuery();
 
     approvalSessions.delete(ctx.chat!.id);
-    for (const a of s.pending) s.tracker.updateStatus(a.id, 'rejected', false);
+    for (const a of s.pending) s.tracker.updateStatus(a.id, "rejected", false);
     s.executor.clearStaging();
 
     await ctx.editMessageText('❌ All changes rejected. Nothing was applied.');
+    
     await ctx.answerCbQuery('Rejected');
   });
 
