@@ -21,7 +21,7 @@ export async function runAgentModel(){
     // check if user cancel or if not then trim goal after tirm "" empty string is falsy
     if(isCancel(goal)||!goal.trim()) return;
 
-    //creates your configuration object
+    //creates configuration object
     const config =defaultAgentConfig();
 
     //It keeps track of actions performed by the agent.
@@ -38,14 +38,16 @@ export async function runAgentModel(){
         // call llm
         model : getAgentModel(),
         // prevent agent from running forever
-        stopWhen:stepCountIs(40),
+        stopWhen:stepCountIs(30),
         instructions:[
             `Workspace root:${config.codebasePath}`,
             `All mutation are stagged until approval.When done, reply with a short summary of what you staged.`,
 
         ].join("\n"),
+
         tools,
     });
+
     // genrate() provided by ai sdk Start the agent's work
     
      const result=await agent.generate({

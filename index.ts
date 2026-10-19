@@ -14,4 +14,5 @@ program.command("wakeup").description("show the banner and pick cli or telegram 
        
     }
 );
+//parses the provides cmd args
  await program.parseAsync(process.argv)

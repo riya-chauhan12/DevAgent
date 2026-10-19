@@ -36,6 +36,7 @@ export function createAgentTools(executor: ToolExecutor) {
             }),
             execute: async({path:p})=>executor.DeleteFile(p)
         }),
+
         create_folder: tool({
       description:
         "Stage creation of a directory tree (pending approval). Uses mkdir -p on apply.",
@@ -44,6 +45,7 @@ export function createAgentTools(executor: ToolExecutor) {
       }),
       execute: async ({ path: p }) => executor.createFolder(p),
     }),
+
       list_files: tool({
       description: "List files and directories under a path.",
       inputSchema: z.object({
@@ -53,6 +55,7 @@ export function createAgentTools(executor: ToolExecutor) {
       execute: async ({ path: p, recursive }) =>
         executor.listFiles(p, recursive),
     }),
+
       search_files: tool({
       description:
         'Find files matching a glob pattern (e.g. "*.ts", "**/*.md"). Optional content substring filter.',
@@ -66,6 +69,7 @@ export function createAgentTools(executor: ToolExecutor) {
       execute: async ({ root, pattern, content_contains }) =>
         executor.searchFiles(root, pattern, content_contains),
     }),
+    
     analyze_codebase: tool({
       description:
         "Summarize structure: file counts, size, extensions. Read-only.",
